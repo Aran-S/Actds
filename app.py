@@ -1,7 +1,13 @@
 import pandas as pd
 import joblib
 import scapy.all as scapy
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
+import requests  # Added to fetch website content
+from bs4 import BeautifulSoup  # Import BeautifulSoup for HTML parsing
+import logging  # Import logging module
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 
 app = Flask(__name__)
 
@@ -36,11 +42,61 @@ def analyze_packet(packet):
     prediction = model.predict([features])  # Predict threat
     return "Malicious" if prediction == 1 else "Safe"
 
-@app.route("/analyze", methods=["GET"])
+def analyze_website_content(content):
+    """Analyze the content of a website for potential threats."""
+    try:
+        soup = BeautifulSoup(content, "html.parser")
+        title = soup.title.string if soup.title else "No Title"
+
+        # Define keywords or patterns that might indicate specific threats
+        threat_keywords = {
+            "malware": "Malware-related content detected",
+            "phishing": "Phishing attempt detected",
+            "attack": "Potential attack-related content detected",
+            "unauthorized": "Unauthorized access-related content detected",
+            "exploit": "Exploit-related content detected",
+        }
+
+        # Check for the presence of threat keywords in the content
+        threats_found = [
+            {"keyword": keyword, "description": description}
+            for keyword, description in threat_keywords.items()
+            if keyword in content.lower()
+        ]
+
+        if threats_found:
+            threat_details = "; ".join(
+                [f"{threat['description']} (keyword: {threat['keyword']})" for threat in threats_found]
+            )
+            return f"Threats detected: {threat_details}. Title: {title}"
+        else:
+            return f"No threats detected. Title: {title}"
+    except Exception as e:
+        logging.error("Error analyzing website content", exc_info=True)
+        return f"Error analyzing content: {str(e)}"
+
+@app.route("/analyze", methods=["POST"])
 def analyze():
-    packets = scapy.sniff(count=10)  # Capture 10 packets
-    results = [analyze_packet(packet) for packet in packets]
-    return jsonify({"analysis": results})
+    data = request.json
+    url = data.get("url")
+    if not url:
+        return jsonify({"error": "No URL provided"}), 400
+
+    try:
+        response = requests.get(url, timeout=10)  # Add timeout to prevent hanging
+        response.raise_for_status()
+        content = response.text
+        result = analyze_website_content(content)
+        return jsonify({"url": url, "analysis": [result]})  # Ensure analysis is an array
+    except requests.exceptions.Timeout:
+        logging.error("Request to the URL timed out")
+        return jsonify({"error": "Request timed out"}), 504
+    except requests.RequestException as e:
+        logging.error("Error fetching the URL", exc_info=True)
+        return jsonify({"error": f"Error fetching the URL: {str(e)}"}), 500
+    except Exception as e:
+        logging.error("Unexpected error occurred", exc_info=True)
+        return jsonify({"error": "Internal server error"}), 500
 
 @app.route("/")
 def home():

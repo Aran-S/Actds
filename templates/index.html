@@ -1,31 +1,71 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Cyber Threat Detection</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-</head>
-<body class="bg-light">
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+    />
+  </head>
+  <body class="bg-light">
     <div class="container mt-5">
-        <h1 class="text-center">Automated Cyber Threat Detection</h1>
-        <button id="analyzeBtn" class="btn btn-danger mt-3">Analyze Network Traffic</button>
-        <ul id="results" class="mt-4 list-group"></ul>
+      <h1 class="text-center">Automated Cyber Threat Detection</h1>
+      <input
+        type="text"
+        id="urlInput"
+        class="form-control mt-3"
+        placeholder="Enter website URL"
+      />
+      <button id="analyzeBtn" class="btn btn-danger mt-3">
+        Analyze Network Traffic
+      </button>
+      <ul id="results" class="mt-4 list-group"></ul>
     </div>
 
     <script>
-        document.getElementById("analyzeBtn").addEventListener("click", async () => {
-            const response = await fetch("/analyze");
+      document
+        .getElementById("analyzeBtn")
+        .addEventListener("click", async () => {
+          const urlInput = document.getElementById("urlInput").value;
+          const resultList = document.getElementById("results");
+          resultList.innerHTML = ""; // Clear previous results
+
+          try {
+            const response = await fetch("{{ url_for('analyze') }}", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ url: urlInput }),
+            });
+
+            if (!response.ok) {
+              throw new Error(`Error: ${response.statusText}`);
+            }
+
             const data = await response.json();
-            const resultList = document.getElementById("results");
-            resultList.innerHTML = "";
-            data.analysis.forEach((item, index) => {
+            if (data.error) {
+              const errorItem = document.createElement("li");
+              errorItem.className = "list-group-item text-danger";
+              errorItem.textContent = `Error: ${data.error}`;
+              resultList.appendChild(errorItem);
+            } else {
+              data.analysis.forEach((item, index) => {
                 const listItem = document.createElement("li");
                 listItem.className = "list-group-item";
-                listItem.textContent = `Packet ${index + 1}: ${item}`;
+                listItem.textContent = `Result ${index + 1}: ${item}`;
                 resultList.appendChild(listItem);
-            });
+              });
+            }
+          } catch (error) {
+            const errorItem = document.createElement("li");
+            errorItem.className = "list-group-item text-danger";
+            errorItem.textContent = `Error: ${error.message}`;
+            resultList.appendChild(errorItem);
+          }
         });
     </script>
-</body>
+  </body>
 </html>
