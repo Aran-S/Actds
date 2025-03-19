@@ -30,7 +30,7 @@
         .addEventListener("click", async () => {
           const urlInput = document.getElementById("urlInput").value;
           const resultList = document.getElementById("results");
-          resultList.innerHTML = ""; // Clear previous results
+          resultList.innerHTML = ""; 
 
           try {
             const response = await fetch("{{ url_for('analyze') }}", {
